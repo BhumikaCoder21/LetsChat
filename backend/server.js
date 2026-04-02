@@ -1,7 +1,14 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+
 const app = express();
+const pool = require("./config/db");
+
+pool
+  .query("SELECT 1")
+  .then(() => console.log("PostgreSQL connected ✅"))
+  .catch((err) => console.log(err));
 
 app.use(cors());
 app.use(express.json());
