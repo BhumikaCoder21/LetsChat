@@ -21,3 +21,28 @@ exports.createChat = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.getUserChats = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+   const chats = await pool.query(
+     `SELECT DISTINCT ON (c.id)
+      c.id AS chat_id,
+      c.is_group,
+      m.content AS last_message,
+      m.created_at
+      FROM chats c
+      JOIN chat_members cm ON c.id = cm.chat_id
+      LEFT JOIN messages m ON m.chat_id = c.id
+      WHERE cm.user_id = $1
+      ORDER BY c.id, m.created_at DESC`,
+     [userId],
+   );
+
+    res.json(chats.rows);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
