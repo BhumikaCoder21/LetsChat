@@ -3,6 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 const authRoutes = require("./routes/authRoutes");
 const authMiddleware = require("./middleware/authMiddleware");
+const chatRoutes = require("./routes/chatRoutes");
 
 const app = express();
 const pool = require("./config/db");
@@ -20,7 +21,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
-
+app.use("/api/chat", chatRoutes);
 
 app.get("/protected", authMiddleware, (req, res) => {
   res.json({
