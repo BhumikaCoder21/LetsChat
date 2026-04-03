@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const authRoutes = require("./routes/authRoutes");
+const authMiddleware = require("./middleware/authMiddleware");
 
 const app = express();
 const pool = require("./config/db");
@@ -19,6 +20,14 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+
+
+app.get("/protected", authMiddleware, (req, res) => {
+  res.json({
+    message: "You accessed protected route",
+    userId: req.user.id,
+  });
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
