@@ -8,6 +8,7 @@ const authRoutes = require("./routes/authRoutes");
 const authMiddleware = require("./middleware/authMiddleware");
 const chatRoutes = require("./routes/chatRoutes");
 const messageRoutes = require("./routes/messageRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 const pool = require("./config/db");
 
@@ -57,6 +58,7 @@ app.set("io", io);
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/message", messageRoutes);
+app.use("/api/users", userRoutes);
 
 app.get("/protected", authMiddleware, (req, res) => {
   res.json({
