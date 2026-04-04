@@ -7,6 +7,8 @@ function Chat() {
   const [messages, setMessages] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [content, setContent] = useState("");
+  const [users, setUsers] = useState([]);
+  const [showUsers, setShowUsers] = useState(false);
   const bottomRef = useRef(null);
   const socketRef = useRef(null);
 
@@ -22,6 +24,12 @@ function Chat() {
     if (!token) return "";
     const payload = JSON.parse(atob(token.split(".")[1]));
     return payload.username;
+  };
+  const fetchUsers = async () => {
+    const res = await axios.get("http://localhost:5000/api/users", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setUsers(res.data);
   };
 
   const username = getUsername();
@@ -51,6 +59,22 @@ function Chat() {
     );
 
     setContent("");
+  };
+
+  const createChat = async (userId) => {
+    try {
+      const res = await axios.post(
+        "http://localhost:5000/api/chat/create",
+        { userId },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      setShowUsers(false); 
+      fetchChats(); 
+      setSelectedChat(res.data.chatId); 
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleLogout = () => {
@@ -89,15 +113,41 @@ function Chat() {
 
   return (
     <div className="h-screen flex flex-col md:flex-row bg-gray-100">
-     
       <div
         className={`${
           selectedChat ? "hidden md:flex" : "flex"
         } w-full md:w-1/3 bg-white border-r flex-col`}
       >
-        <div className="p-4 font-bold text-lg border-b">Chats 💬</div>
+        <div className="p-4 border-b">
+          <div className="flex justify-between items-center">
+            <h3 className="font-bold text-lg">Chats 💬</h3>
+
+            <button
+              onClick={() => {
+                setShowUsers(!showUsers);
+                fetchUsers();
+              }}
+              className="bg-blue-500 text-white px-2 py-1 rounded text-sm"
+            >
+              + New
+            </button>
+          </div>
+        </div>
 
         <div className="flex-1 overflow-y-auto">
+          {showUsers && (
+            <div className="p-2 bg-gray-50">
+              {users.map((user) => (
+                <div
+                  key={user.id}
+                  className="p-2 cursor-pointer hover:bg-gray-200 rounded"
+                  onClick={() => createChat(user.id)}
+                >
+                  {user.username}
+                </div>
+              ))}
+            </div>
+          )}
           {chats.map((chat) => (
             <div
               key={chat.chat_id}
@@ -120,11 +170,8 @@ function Chat() {
           selectedChat ? "flex" : "hidden md:flex"
         } w-full md:w-2/3 flex-col`}
       >
-   
         <div className="p-4 bg-white border-b flex items-center justify-between">
-
           <div className="flex items-center gap-3">
-           
             <button
               className="md:hidden text-lg"
               onClick={() => setSelectedChat(null)}
@@ -143,11 +190,10 @@ function Chat() {
               <p className="font-semibold text-lg">
                 {chats.find((c) => c.chat_id === selectedChat)?.username}
               </p>
-              <p className="text-xs text-gray-500">online</p> 
+              <p className="text-xs text-gray-500">online</p>
             </div>
           </div>
 
-          
           <button
             onClick={handleLogout}
             className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
@@ -155,7 +201,7 @@ function Chat() {
             Logout
           </button>
         </div>
-     
+
         <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50">
           {messages.length === 0 && (
             <div className="flex justify-center items-center h-full text-gray-400">
