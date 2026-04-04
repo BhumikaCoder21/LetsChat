@@ -2,8 +2,12 @@ const pool = require("../config/db");
 
 exports.createChat = async (req, res) => {
   try {
-    const { userId } = req.body; 
+    const { userId } = req.body;
     const currentUserId = req.user.id;
+    if (userId === currentUserId) {
+      return res.status(400).json({ error: "Cannot chat with yourself" });
+    }
+
     const existingChat = await pool.query(
       `SELECT c.id
       FROM chats c
@@ -11,17 +15,14 @@ exports.createChat = async (req, res) => {
       JOIN chat_members cm2 ON c.id = cm2.chat_id
       WHERE cm1.user_id = $1 AND cm2.user_id = $2 AND c.is_group = false`,
       [currentUserId, userId],
-      );
-      
+    );
+
     if (existingChat.rows.length > 0) {
-        return res.json({
-          message: "Chat already exists",
-          chatId: existingChat.rows[0].id,
-        });
+      return res.json({ chatId: existingChat.rows[0].id });
     }
-      
-     const chat = await pool.query(
-      "INSERT INTO chats (is_group) VALUES (false) RETURNING *",
+
+    const chat = await pool.query(
+      "INSERT INTO chats (is_group) VALUES (false) RETURNING id",
     );
 
     const chatId = chat.rows[0].id;
@@ -31,18 +32,20 @@ exports.createChat = async (req, res) => {
       [chatId, currentUserId, userId],
     );
 
-    res.json({ message: "Chat created", chatId });
+    res.json({ chatId });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 };
+
 
 exports.getUserChats = async (req, res) => {
   try {
     const userId = req.user.id;
 
-  const chats = await pool.query(
-    `SELECT DISTINCT ON (c.id)
+    const chats = await pool.query(
+      `SELECT DISTINCT ON (c.id)
     c.id AS chat_id,
     c.is_group,
     u.username,
@@ -56,11 +59,10 @@ exports.getUserChats = async (req, res) => {
     SELECT chat_id FROM chat_members WHERE user_id = $1
   )
   ORDER BY c.id, m.created_at DESC `,
-    [req.user.id],
-  );
+      [req.user.id],
+    );
 
     res.json(chats.rows);
-
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
