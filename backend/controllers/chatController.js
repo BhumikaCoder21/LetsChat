@@ -67,3 +67,31 @@ exports.getUserChats = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+
+
+exports.createGroupChat = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const { name, users } = req.body; 
+
+    const chat = await pool.query(
+      "INSERT INTO chats (is_group, name) VALUES (true, $1) RETURNING id",
+      [name],
+    );
+
+    const chatId = chat.rows[0].id;
+    const allUsers = [...users, currentUserId];
+
+    for (let userId of allUsers) {
+      await pool.query(
+        "INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2)",
+        [chatId, userId],
+      );
+    }
+   res.json({ chatId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
