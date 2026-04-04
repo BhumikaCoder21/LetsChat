@@ -2,24 +2,29 @@ import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:5000");
-
 function Chat() {
   const [chats, setChats] = useState([]);
   const [messages, setMessages] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [content, setContent] = useState("");
   const bottomRef = useRef(null);
+  const socketRef = useRef(null);
 
   const token = localStorage.getItem("token");
 
   const getUserId = () => {
-    const token = localStorage.getItem("token");
     if (!token) return null;
     const payload = JSON.parse(atob(token.split(".")[1]));
     return payload.id;
   };
 
+  const getUsername = () => {
+    if (!token) return "";
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.username;
+  };
+
+  const username = getUsername();
   const currentUserId = getUserId();
 
   const fetchChats = async () => {
@@ -37,7 +42,7 @@ function Chat() {
   };
 
   const sendMessage = async () => {
-    if (!content) return;
+    if (!content.trim()) return;
 
     await axios.post(
       "http://localhost:5000/api/message/send",
@@ -48,31 +53,43 @@ function Chat() {
     setContent("");
   };
 
-  
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    window.location.href = "/";
+  };
+
   useEffect(() => {
     fetchChats();
 
     const userId = getUserId();
-    socket.emit("join", userId);
 
-    socket.on("receive_message", (msg) => {
+    socketRef.current = io("http://localhost:5000");
+    socketRef.current.emit("join", userId);
+
+    socketRef.current.on("receive_message", (msg) => {
       if (msg.chat_id === selectedChat) {
         setMessages((prev) => [...prev, msg]);
       }
     });
 
-    return () => socket.off("receive_message");
+    return () => {
+      socketRef.current.disconnect();
+    };
   }, [selectedChat]);
 
 
   useEffect(() => {
+    if (selectedChat) fetchMessages(selectedChat);
+  }, [selectedChat]);
+
+ 
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
- 
   return (
     <div className="h-screen flex flex-col md:flex-row bg-gray-100">
-   
+     
       <div
         className={`${
           selectedChat ? "hidden md:flex" : "flex"
@@ -84,11 +101,12 @@ function Chat() {
           {chats.map((chat) => (
             <div
               key={chat.chat_id}
-              onClick={() => {
-                setSelectedChat(chat.chat_id);
-                fetchMessages(chat.chat_id);
-              }}
-              className="p-4 cursor-pointer hover:bg-gray-100 border-b"
+              onClick={() => setSelectedChat(chat.chat_id)}
+              className={`p-4 cursor-pointer border-b ${
+                selectedChat === chat.chat_id
+                  ? "bg-blue-100"
+                  : "hover:bg-gray-100"
+              }`}
             >
               <p className="font-semibold">{chat.username}</p>
               <p className="text-sm text-gray-500">{chat.last_message}</p>
@@ -97,26 +115,54 @@ function Chat() {
         </div>
       </div>
 
-
       <div
         className={`${
           selectedChat ? "flex" : "hidden md:flex"
         } w-full md:w-2/3 flex-col`}
       >
-        
-        <div className="p-4 bg-white border-b flex items-center gap-2 font-semibold">
+   
+        <div className="p-4 bg-white border-b flex items-center justify-between">
+
+          <div className="flex items-center gap-3">
+           
+            <button
+              className="md:hidden text-lg"
+              onClick={() => setSelectedChat(null)}
+            >
+              ⬅️
+            </button>
+
+            <div className="w-10 h-10 bg-purple-500 text-white rounded-full flex items-center justify-center text-lg">
+              {chats
+                .find((c) => c.chat_id === selectedChat)
+                ?.username?.charAt(0)
+                .toUpperCase()}
+            </div>
+
+            <div>
+              <p className="font-semibold text-lg">
+                {chats.find((c) => c.chat_id === selectedChat)?.username}
+              </p>
+              <p className="text-xs text-gray-500">online</p> 
+            </div>
+          </div>
+
           
           <button
-            className="md:hidden text-lg"
-            onClick={() => setSelectedChat(null)}
+            onClick={handleLogout}
+            className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
           >
-            ⬅️
+            Logout
           </button>
-
-          {selectedChat ? "Chat" : "Select a chat"}
         </div>
+     
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50">
+          {messages.length === 0 && (
+            <div className="flex justify-center items-center h-full text-gray-400">
+              Start conversation 👋
+            </div>
+          )}
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -127,7 +173,7 @@ function Chat() {
               }`}
             >
               <div
-                className={`px-4 py-2 rounded-lg max-w-xs ${
+                className={`px-4 py-2 rounded-lg max-w-[70%] ${
                   msg.sender_id === currentUserId
                     ? "bg-green-500 text-white"
                     : "bg-white border"
@@ -144,7 +190,7 @@ function Chat() {
         {selectedChat && (
           <div className="p-4 bg-white border-t flex gap-2">
             <input
-              className="flex-1 border rounded-lg px-3 py-2 focus:outline-none"
+              className="flex-1 border rounded-full px-4 py-2 focus:outline-none"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Type a message..."
@@ -155,9 +201,14 @@ function Chat() {
 
             <button
               onClick={sendMessage}
-              className="bg-green-500 text-white px-4 rounded-lg hover:bg-green-600"
+              disabled={!content.trim()}
+              className={`px-5 rounded-full ${
+                content.trim()
+                  ? "bg-green-500 text-white hover:bg-green-600"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
             >
-              Send
+              ➤
             </button>
           </div>
         )}
